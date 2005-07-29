@@ -1,0 +1,5 @@
+etc/init.d
+etc/skel/Desktop
+usr/sbin
+usr/share/applnk/Kanotix/Services
+usr/share/icons/

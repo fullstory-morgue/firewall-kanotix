@@ -1,0 +1,6 @@
+firewall-kanotix.desktop etc/skel/Desktop/
+firewall etc/init.d/
+firewall usr/sbin/
+startiptraf usr/sbin/
+*.desktop usr/share/applnk/Kanotix/Services/
+icons/* usr/share/icons/

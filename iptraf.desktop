@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=IPTRAF
+Comment=IP Traffic Analyzer
+Exec=gksu -- rxvt -bg black -fg green -cr red -ls -e /usr/sbin/iptraf
+Icon=iptraf
+Type=Application

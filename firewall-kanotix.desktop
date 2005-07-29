@@ -1,0 +1,6 @@
+[Desktop Entry]
+Comment=KANOTIX Firewall
+Exec=gksu -- /etc/init.d/firewall
+Icon=kanotix
+Name=KANOTIX Firewall
+Type=Application

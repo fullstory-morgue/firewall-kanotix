@@ -1,0 +1,861 @@
+#!/bin/bash
+# KNOPPIX firewall configuration script
+# (C) Klaus Knopper 2004 - GPL
+
+PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/X11R6/bin:/usr/local/bin"
+export PATH
+
+[ ! -e /proc/partitions ] && { echo "$0: /proc not mounted, exiting" >&2; exit 1; }
+
+# Get root
+[ "`id -u`" != "0" ] && exec sudo "$0" "$@"
+unset SUDO_COMMAND
+
+XDIALOG_HIGH_DIALOG_COMPAT=1
+export XDIALOG_HIGH_DIALOG_COMPAT
+
+XDIALOG_FORCE_AUTOSIZE=1
+export XDIALOG_FORCE_AUTOSIZE
+
+TMP="/tmp/firewall.$$"
+TMPSUFFIX="knoppix-firewall.save"
+
+DIALOG="dialog"
+[ -n "$DISPLAY" ] && [ -x /usr/bin/Xdialog ] && DIALOG="Xdialog"
+
+trap bailout 1 2 3 15
+
+bailout(){
+rm -f "$TMP"
+exit $1
+}
+
+# LANGUAGE etc.
+[ -f /etc/sysconfig/knoppix ] && . /etc/sysconfig/knoppix
+[ -f /etc/sysconfig/firewall ] && . /etc/sysconfig/firewall
+[ -z "$LANG" ] && export LANG
+[ -z "$LANGUAGE" ] && export LANGUAGE
+[ -z "$CHARSET" ] && export CHARSET
+
+CMDLINE="$(cat /proc/cmdline)"
+
+# same for strings
+stringinstring(){
+case "$2" in *$1*) return 0;; esac
+return 1
+}
+
+# Reread boot command line; echo last parameter's argument or return false.
+getbootparam(){
+stringinstring " $1=" "$CMDLINE" || return 1
+result="${CMDLINE##*$1=}"
+result="${result%%[ 	]*}"
+echo "$result"
+return 0
+}
+
+
+BACKTITLE="KNOPPIX FIREWALL TOOL"
+
+# Language-dependent Messages
+case "$LANGUAGE" in
+de*|at*|ch*)
+MAIN="Hauptmenü"
+MODE="Modus"
+HELP_EASY="Einzelrechner, Portfilter ohne ICMP, nur ausgehende Verbindungen"
+HELP_MEDIUM="Router-Funktion möglich, Filter und Freischaltung einzelner Ports"
+HELP_EXPERT="Easy+Medium plus Direkteingabe von iptables-Filterregeln"
+ACTIVATE="Firewall Aktiv?"
+ACTIVE_ON="Firewall jetzt starten"
+ACTIVE_OFF="Firewall deaktivieren"
+EXT_DEV="Externe Netzwerkdevices"
+KNOPPIX_TS="Knoppix Terminal Server"
+TERMINALSERVER_HELP="Der Knoppix Terminalserver erlaubt es, diesen Rechner als Internet-Gateway, DHCP- und Bootserver für ein internes Netzwerk (LAN) zu konfigurieren."
+TERMINALSERVER_SETTING="Knoppix Terminal Server Einstellung"
+TERMINALSERVER_ON="Knoppix TS einschalten"
+TERMINALSERVER_OFF="Knoppix TS ausschalten"
+TERMINALSERVER_SETUP="Knoppix TS Setup"
+IPSEC_T="IPSEC Transparenz"
+IPSEC_SETTING="IPSEC Einstellung"
+IPSEC_ON="IPSEC Transparenz ein"
+IPSEC_OFF="IPSEC Transparenz aus"
+INCOMING_PORTS="Ports freigeben"
+OUTGOING_PORTS="Verbindungen nach außen einschränken"
+OUTGOING_PORTS_HELP="Folgende Ports/Dienste zulassen (leer lassen für \"alle\")."
+START_EDITOR="Editor starten"
+MODE_SELECTION="Modusauswahl"
+EXTENDED="Erweitert"
+OWN_EXT_DEV="Externe Netzwerk-Devices"
+OWN_DESC="Eigene eintragen, durch Leerzeichen getrennt"
+NETWORK_CARD="Netzwerkkarte"
+ALL_NETWORK_CARDS="Alle Netzwerkkarten"
+PPP_DEVICE="Modem"
+ALL_PPP_DEVICES="Alle Modems"
+IPPP_DEVICE="ISDN Karte"
+ALL_IPPP_DEVICES="Alle ISDN Karten"
+INCOMING_PORTS_SELECTION="Auswahl offener Ports"
+OUTGOING_PORTS_SELECTION="Auswahl erlaubter Verbindungen"
+OUTGOING_PORTS_HELP="Allow connections to these ports/services (leave empty for \"all\")"
+ICMP_PORT="ICMP (ping etc.)"
+HTTP_PORT="WWW"
+HTTPS_PORT="Verschlüsseltes WWW"
+SSH_PORT="Secure Shell"
+FTP_PORT="File Transfer Protocol"
+TELNET_PORT="Telnet"
+SMTP_PORT="Mail senden"
+TIME_PORT="Zeitserverabgleich"
+DNS_PORT="Domain Name Service"
+WHOIS_PORT="Whois-Abfragen"
+POP3_PORT="Mail abholen"
+POP3S_PORT="Mail verschlüsselt abholen"
+IMAP_PORT="IMAP Service"
+IMAPS_PORT="IMAP Service verschlüsselt"
+MASQUERADE_SETTING="Forwarding+Masquerading"
+MASQUERADE_HELP="Mit dieser Funktion schalten Sie den Netzzugang für das interne Netz über den Firewall nach außen frei."
+MASQUERADE_ON="Routerfunktion einschalten"
+MASQUERADE_OFF="Routerfunktion ausschalten"
+PROXY_SETTING="Proxy + Transparenter WWW-Cache"
+PROXY_HELP="Startet einen WWW-Proxy (squid) auf Port 8080, und leitet WWW-Anfragen (Port 80) automatisch auf den lokalen Cache um."
+PROXY_ON="Proxy einschalten"
+PROXY_OFF="Proxy ausschalten"
+SAVECONFIG="Konfiguration speichern"
+SAVECONFIG_HELP="Konfiguration speichern und (optional) beim Booten wiederherstellen + Firewall starten."
+SAVECONFIG_ERROR="Fehler beim Speichern der Konfiguration.
+"
+SAVECONFIG_SUCCESS="Die Firewall-Konfiguration wurde erfolgreich gespeichert."
+NOX_SETTING="Möchten Sie beim Booten mit einem dedizierten Firewall-Setup starten (d.h. keine graphische Oberfläche)?"
+LOGPART_SETTING="Persistente Logdateien"
+LOGPART_HELP="Logdateien auf einer schreibbaren (Linux oder FAT32) Partition anlegen."
+LOGPART_ERROR="Fehler: Das Verzeichnis \"knoppix.log\" konnte nicht zum Schreiben angelegt werden."
+LOGPART_NONE="Kein permanentes Log einrichten."
+;;
+*)
+MAIN="Main Menu"
+MODE="Mode"
+HELP_EASY="Single machine, port filter w/o icmp, only outgoing connections"
+HELP_MEDIUM="Router function possible, filter and/or opening of specific ports"
+HELP_EXPERT="Easy+Medium options plus direct editing of iptables filter rules"
+ACTIVATE="Firewall Active?"
+ACTIVE_ON="Start Firewall now"
+ACTIVE_OFF="Deactivate Firewall"
+EXT_DEV="External Devices"
+KNOPPIX_TS="Knoppix Terminal Server"
+TERMINALSERVER_SETTING="Knoppix Terminal Server Setting"
+TERMINALSERVER_HELP="The Knoppix Terminalserver can setup this computer as an internet gateway, DHCP- and Bootserver for a local network (LAN)."
+TERMINALSERVER_ON="Enable Knoppix TS"
+TERMINALSERVER_OFF="Disable Knoppix TS"
+TERMINALSERVER_SETUP="Setup Knoppix TS"
+IPSEC_T="IPSEC transparency"
+IPSEC_SETTING="IPSEC transparency"
+IPSEC_ON="Turn on IPSEC transparency"
+IPSEC_OFF="Turn off IPSEC transparency"
+INCOMING_PORTS="Open Ports"
+OUTGOING_PORTS="Limit outgoing connections"
+START_EDITOR="Start Editor"
+MODE_SELECTION="Mode Selection"
+EXTENDED="Extended"
+OWN_EXT_DEV="External network devices"
+OWN_DESC="Specify your own, as space-separated list"
+NETWORK_CARD="Network card"
+ALL_NETWORK_CARDS="All network cards"
+PPP_DEVICE="PPP device"
+ALL_PPP_DEVICES="All PPP devices"
+IPPP_DEVICE="ISDN card"
+ALL_IPPP_DEVICES="All ISDN cards"
+INCOMING_PORTS_SELECTION="Select open connections"
+OUTGOING_PORTS_SELECTION="Select open ports"
+ICMP_PORT="ICMP (ping et al.)"
+HTTP_PORT="WWW"
+HTTPS_PORT="Secure WWW"
+SSH_PORT="Secure Shell"
+FTP_PORT="File Transfer Protocol"
+TELNET_PORT="Telnet"
+SMTP_PORT="Send mail"
+TIME_PORT="Time server usage"
+DNS_PORT="Domain name service"
+WHOIS_PORT="Whois requets"
+POP3_PORT="Pop mail"
+POP3S_PORT="Secure pop mail"
+IMAP_PORT="IMAP Service"
+IMAPS_PORT="IMAP Service encrypted"
+MASQUERADE_SETTING="Forwarding+Masquerading"
+MASQUERADE_HELP="With this option, you allow sharing the internet connection for the local network over the firewall."
+MASQUERADE_ON="Enable router function"
+MASQUERADE_OFF="Disable router function"
+PROXY_SETTING="Proxy + Transparent WWW-Cache"
+PROXY_HELP="Starts a www-Proxy (squid) on port 8080, redirects www-requests (Port 80) to the proxy automatically."
+PROXY_ON="Turn on Proxy"
+PROXY_OFF="Turn off Proxy"
+SAVECONFIG="Save configuration"
+SAVECONFIG_HELP="Save firewall configuration and (as an option) restore + start firewall at boottime."
+SAVECONFIG_ERROR="Error while saving configuration.
+"
+SAVECONFIG_SUCCESS="The firewall configuration was saved successfully."
+NOX_SETTING="Do you want to start with a dedicated firewall setup on reboot (i.e. no graphical environment running)?"
+LOGPART_SETTING="Persistent Logfiles"
+LOGPART_HELP="Write system logfiles to a (Linux or FAT32) harddisk partition."
+LOGPART_ERROR="Error: The \"knoppix.log\" directory could not be created in read/write mode."
+LOGPART_NONE="Don't use a persistent log directory."
+;;
+esac
+
+ETH0_INT="off"
+ETH1_INT="off"
+ETHP_INT="on"
+PPP0_INT="off"
+PPP1_INT="off"
+PPPP_INT="off"
+IPPP0_INT="off"
+IPPP1_INT="off"
+IPPPP_INT="off"
+
+ICMP_INT="on"
+HTTP_INT="off"
+HTTPS_INT="off"
+SSH_INT="off"
+FTP_INT="off"
+TELNET_INT="off"
+SMTP_INT="off"
+TIME_INT="off"
+DNS_INT="off"
+WHOIS_INT="off"
+POP3_INT="off"
+POP3S_INT="off"
+IMAP_INT="off"
+IMAPS_INT="off"
+
+ETH0_EXT="off"
+ETH1_EXT="off"
+ETHP_EXT="off"
+PPP0_EXT="off"
+PPP1_EXT="off"
+PPPP_EXT="on"
+IPPP0_EXT="off"
+IPPP1_EXT="off"
+IPPPP_EXT="on"
+
+ICMP_EXT="off"
+HTTP_EXT="off"
+HTTPS_EXT="off"
+SSH_EXT="off"
+FTP_EXT="off"
+TELNET_EXT="off"
+SMTP_EXT="off"
+TIME_EXT="off"
+DNS_EXT="off"
+WHOIS_EXT="off"
+POP3_EXT="off"
+POP3S_EXT="off"
+IMAP_EXT="off"
+IMAPS_EXT="off"
+PROXY="off"
+MASQUERADE="off"
+
+# Location of the ipchains binary (required)
+IPTABLES=/sbin/iptables
+IP6TABLES=/sbin/ip6tables
+test -x $IPTABLES || { echo "$IPTABLES missing, exiting." >&2; exit 1; }
+test -x $IP6TABLES || { echo "$IP6TABLES missing, exiting." >&2; exit 1; }
+
+# Location of the insmod and rmmod binary (required)
+INSMOD=/sbin/modprobe
+RMMOD=/sbin/rmmod
+
+# Devices to filter
+EXTDEVS="ippp+ ppp+ eth+"
+
+# Port-Filters
+# My ports that are open. Empty means no connection is possible.
+PORTS_ALLOWED=""
+# Remote ports that are allowed to connect from here. Empty means ALL.
+REMOTE_PORTS_ALLOWED=""
+
+# Subfeatures
+IPSEC="on"
+TERMINALSERVER="off"
+[ -e /var/run/firewall.pid ] && ACTIVE="yes"
+
+# Mode: Which options are shown
+CURRENTMODE="easy"
+# easy: Standalone machine, filter all incoming traffic EXCEPT ICMP, allow all outgoing traffic
+# medium: Possible gateway machine, filter all incoming traffic (if not in state), icmp filter option, allow all outgoing traffic, masquerading and transparent proxy
+# expert: Show all options, allow direct insertion of iptables-lines via /etc/sysconfig/firewall.iptables
+
+[ -f /etc/sysconfig/firewall ] && . /etc/sysconfig/firewall
+
+saveconfig(){
+ # Save configuration to harddisk or floppy/usb memorystick
+ $DIALOG --backtitle "$BACKTITLE" --title "$SAVECONFIG" --defaultno --yesno "$NOX_SETTING" 8 65 && writeconfig NOX "yes" || writeconfig NOX "no"
+ # Directory selector
+ PARTITIONS=""
+ for i in `awk '/^\/dev\/[hs]d[a-z].*\/mnt\/[hs]d[a-z]/{if(!/ntfs/){print $2}}' /etc/fstab`; do
+ PARTITIONS="$PARTITIONS ${i} [Disk/Partition] off"
+ done
+ rm -f "$TMP"
+ $DIALOG --backtitle "$BACKTITLE" --title "$SAVECONFIG" --radiolist "$SAVECONFIG_HELP" 18 75 9 $PARTITIONS 2>"$TMP" || return 1
+ DIRECTORY="$(<$TMP)"
+ [ -z "$DIRECTORY" -o ! -e "$DIRECTORY" ] && return 1
+ rm -f "$TMP.err"
+ mount | grep -q "$DIRECTORY" || mount -r "$DIRECTORY" >"$TMP.err"
+ [ "$?" != "0" ] && { $DIALOG --backtitle "$BACKTITLE" --title "$SAVECONFIG" --msgbox "$SAVECONFIG_ERROR `cat $TMP.err`" 10 75; rm -f "$TMP.err"; return 1; }
+ rm -f "$TMP.err"
+ mount | grep -q "$DIRECTORY.*ntfs" && { $DIALOG --backtitle "$BACKTITLE" --title "$SAVECONFIG" --msgbox "$SAVECONFIG_ERROR NTFS" 10 75; return 1; }
+ mount -o remount,rw "$DIRECTORY"
+ BZIP2=-9 tar --exclude /etc/network/ifstate -jcpPf "$DIRECTORY"/firewall.tbz /etc/network /etc/chatscripts /etc/ppp /etc/isdn /etc/sysconfig/firewall /etc/sysconfig/kanotix-terminalserver /etc/sysconfig/network* /etc/sysconfig/provider /etc/resolv.conf /etc/dhcpc/resolv.conf /etc/hosts /etc/hosts.* /etc/inetd.conf /etc/exports /etc/squid/squid.conf /etc/bind /var/lib/iptraf/iptraf.cfg >"$TMP.err"
+ RC="$?"
+ umount "$DIRECTORY"
+ [ "$RC" = "0" -o "$RC" = "2" ] && $DIALOG --backtitle "$BACKTITLE" --title "$SAVECONFIG" --msgbox "$SAVECONFIG_SUCCESS" 12 65 || $DIALOG --backtitle "$BACKTITLE" --title "$SAVECONFIG" --msgbox "$SAVECONFIG_ERROR $RC:
+`cat $TMP.err`" 10 75
+ rm -f "$TMP.err"
+}
+
+logpart(){
+ # Save logfiles to harddisk or usb memorystick
+ # Directory selector
+ PARTITIONS=""
+ for i in `awk '/^\/dev\/[hs]d[a-z].*\/mnt\/[hs]d[a-z]/{if(!/ntfs/){print $2}}' /etc/fstab`; do
+ PARTITIONS="$PARTITIONS ${i} [Disk/Partition]"
+ case "$LOGPART" in *$i*) PARTITIONS="$PARTITIONS on";; *) PARTITIONS="$PARTITIONS off";; esac
+ done
+ rm -f "$TMP"
+ $DIALOG --backtitle "$BACKTITLE" --title "$LOGPART_SETTING" --radiolist "$LOGPART_HELP" 18 75 9 "$LOGPART_NONE" "" off $PARTITIONS 2>"$TMP" || return 0
+ DIRECTORY="$(<$TMP)"
+ case "$DIRECTORY" in
+  $LOGPART_NONE) LOGPART="";;
+  *) [ -e "$DIRECTORY" ]  && LOGPART="$DIRECTORY";;
+ esac
+
+ writeconfig LOGPART "$LOGPART"
+ runlog
+}
+
+runsquid(){
+ if [ "$CURRENTMODE" != "easy" -a "$PROXY" = "on" ]; then
+  if [ -x /etc/init.d/squid ]; then
+  /etc/init.d/squid stop >/dev/null 2>&1
+  # squid ports are blocked by iptables on $EXTDEVS, therefore we can safely run squid on all local IP addresses.
+  [ ! -f /etc/squid/squid.conf."$TMPSUFFIX" ] && mv -f /etc/squid/squid.conf /etc/squid/squid.conf."$TMPSUFFIX"
+  cat >/etc/squid/squid.conf <<EOT
+# squid.conf for KNOPPIX-Firewall
+# Transparent proxy config
+visible_hostname Knoppix
+http_port 3128
+http_port 8080
+cache_mem 8 MB
+cache_dir ufs /var/spool/squid 16 16 256
+httpd_accel_host virtual
+httpd_accel_port 80
+httpd_accel_with_proxy on
+httpd_accel_uses_host_header on
+icp_port 0
+hierarchy_stoplist cgi-bin ?
+acl QUERY urlpath_regex cgi-bin \?
+no_cache deny QUERY
+acl all src 0.0.0.0/0.0.0.0
+acl manager proto cache_object
+acl localhost src 127.0.0.1/255.255.255.255
+acl SSL_ports port 443 563
+acl Safe_ports port 80		# http
+acl Safe_ports port 21		# ftp
+acl Safe_ports port 443 563	# https, snews
+acl Safe_ports port 70		# gopher
+acl Safe_ports port 210		# wais
+acl Safe_ports port 1025-65535	# unregistered ports
+acl Safe_ports port 280		# http-mgmt
+acl Safe_ports port 488		# gss-http
+acl Safe_ports port 591		# filemaker
+acl Safe_ports port 631		# cups
+acl Safe_ports port 777		# multiling http
+acl Safe_ports port 901		# SWAT
+acl purge method PURGE
+acl CONNECT method CONNECT
+http_access allow manager localhost
+http_access deny manager
+http_access allow purge localhost
+http_access deny purge
+http_access deny !Safe_ports
+http_access deny CONNECT !SSL_ports
+http_access allow localhost
+http_access allow all
+http_access deny all
+icp_access deny all
+EOT
+  [ ! -d /var/spool/squid/00 ] && squid -z
+  /etc/init.d/squid start
+  iptables -A PREROUTING -t nat -p tcp --dport 80 -j REDIRECT --to-port 8080
+ else
+  echo "squid not installed, skipping." >&2
+ fi
+fi
+}
+
+runlog(){
+[ -n "$LOGPART" ] || return 0
+[ -z "$(grep "$LOGPART " /proc/mounts)" ] && mount -r "$LOGPART"
+if [ -z "$(grep "$LOGPART " /proc/mounts)" ] || grep -q "$LOGPART .*ntfs" /proc/mounts || { mount -o remount,rw "$LOGPART"; [ "$?" != "0" ]; }; then
+ $DIALOG --backtitle "$BACKTITLE" --title "$LOGPART_SETTING" --msgbox "$LOGPART_ERROR" 10 75
+ return 1
+fi
+mkdir -p "$LOGPART/knoppix.log"
+/etc/init.d/sysklogd stop
+[ -L /var/log ] && rm -f /var/log || \mv -f /var/log /var/log.old
+ln -sf "$LOGPART/knoppix.log" /var/log
+( cp -au /var/log.old/* /var/log/ 2>/dev/null)
+/etc/init.d/sysklogd start
+}
+
+fw_reset(){
+
+ [ "$CURRENTMODE" != "easy" -a "$PROXY" = "on" ] && /etc/init.d/squid stop >/dev/null 2>&1
+
+ for chain in INPUT OUTPUT FORWARD; do
+  for ipt in $IPTABLES $IP6TABLES; do
+   $ipt -F $chain 
+  done
+ done
+
+ for chain in POSTROUTING PREROUTING; do
+  for ipt in $IPTABLES $IP6TABLES; do # ip6tables does not seem to support stateful filtering yet, but anyways.
+   $ipt -t nat -F $chain 2>/dev/null
+  done
+ done
+
+ for n in TOINTERNET FROMINTERNET FWDINTERNET; do
+  for ipt in $IPTABLES $IP6TABLES; do
+   $ipt -F $n 2>/dev/null
+   $ipt -X $n 2>/dev/null
+   $ipt -N $n
+  done
+ done
+
+ # Default policy is to allow everything but forwarding
+ for ipt in $IPTABLES $IP6TABLES; do
+  $ipt -P FORWARD DROP
+  $ipt -P INPUT   ACCEPT
+  $ipt -P OUTPUT  ACCEPT
+ done
+ echo 0 >/proc/sys/net/ipv4/ip_forward
+ 
+ [ "$CURRENTMODE" != "easy" -a "$TERMINALSERVER" = "on" ] && kanotix-terminalserver stop
+
+ rm -f /var/run/firewall.pid
+}
+
+runmasquerade(){
+ if [ "$CURRENTMODE" = "easy" -o "$MASQUERADE" = "on" ]; then
+  iptables -I FWDINTERNET -j ACCEPT
+  ip6tables -I FWDINTERNET -j ACCEPT
+  iptables -I FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+  # ip6tables still doesn't understand stateful filtering. :-(
+  ip6tables -I FORWARD -p tcp ! --syn -j ACCEPT
+  iptables -I POSTROUTING -t nat -j MASQUERADE
+  # and neither masquerading.
+  # ip6tables -I POSTROUTING -t nat -j MASQUERADE"
+  echo 1 >/proc/sys/net/ipv4/ip_forward
+  echo 2 >/proc/sys/net/ipv4/ip_dynaddr
+ else
+  echo 0 >/proc/sys/net/ipv4/ip_dynaddr
+  echo 0 >/proc/sys/net/ipv4/ip_forward
+  iptables -D FWDINTERNET -j ACCEPT >/dev/null 2>&1
+  ip6tables -D FWDINTERNET -j ACCEPT >/dev/null 2>&1
+  iptables -D FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT >/dev/null 2>&1
+  # ip6tables still doesn't understand stateful filtering. :-(
+  ip6tables -D FORWARD -p tcp ! --syn -j ACCEPT >/dev/null 2>&1
+  iptables -D POSTROUTING -t nat -j MASQUERADE >/dev/null 2>&1
+  # and neither masquerading.
+  # ip6tables -I POSTROUTING -t nat -j MASQUERADE"
+ fi
+}
+
+runterminalserver(){
+ [ "$CURRENTMODE" != "easy" -a "$TERMINALSERVER" = "on" ] && kanotix-terminalserver start || kanotix-terminalserver stop
+}
+
+fw_start(){
+ # Bailout if firewall is set to inactive!
+ [ "$ACTIVE" != "yes" ] && return 1
+
+ # Allow loopback (faster than fallback rule)
+ $IPTABLES -I INPUT -i lo -j ACCEPT
+
+ # Internet is the EXTERNAL device
+ for DEV in $EXTDEVS; do
+  for ipt in $IPTABLES $IP6TABLES; do
+   $ipt -A INPUT   -i $DEV -j FROMINTERNET
+   $ipt -A OUTPUT  -o $DEV -j TOINTERNET
+   $ipt -A FORWARD -o $DEV -j FWDINTERNET
+  done
+ done
+
+ if [ "$CURRENTMODE" = "easy" -o -z "$PORTS_ALLOWED" ]; then
+  $IPTABLES -A FROMINTERNET -p icmp -j ACCEPT
+  $IP6TABLES -A FROMINTERNET -p icmpv6 -j ACCEPT
+ else
+  for port in $PORTS_ALLOWED; do
+   if [ "$port" = "icmp" ]; then
+    $IPTABLES -A FROMINTERNET -p icmp -j ACCEPT
+    $IP6TABLES -A FROMINTERNET -p icmpv6 -j ACCEPT
+   else
+    for ipt in $IPTABLES $IP6TABLES; do
+      for prot in tcp udp; do
+       $ipt -A FROMINTERNET -p $prot --dport $port -j ACCEPT
+      done
+    done
+   fi
+  done
+ fi
+ $IPTABLES -A FROMINTERNET -m state --state ESTABLISHED,RELATED -j ACCEPT
+ # ip6tables still doesn't understand stateful filtering. :-(
+ $IP6TABLES -A FROMINTERNET -p tcp ! --syn -j ACCEPT
+
+# IPSEC and CISCO(R) VPN Client requirements
+ if [ "$CURRENTMODE" != "easy" -a "$IPSEC" = "on" ]; then
+  for ipt in $IPTABLES $IP6TABLES; do
+   $ipt -A FROMINTERNET -p udp --sport 500 --dport 500 -j ACCEPT
+   $ipt -A FROMINTERNET -p udp --dport 10000 -j ACCEPT
+   $ipt -A FROMINTERNET -p 50 -j ACCEPT # ipsec
+   $ipt -A FROMINTERNET -p 51 -j ACCEPT # AH authentication headers
+   $ipt -A FWDINTERNET -p udp --sport 500 --dport 500 -j ACCEPT
+   $ipt -A FWDINTERNET -p udp --dport 10000 -j ACCEPT
+   $ipt -A FWDINTERNET -p 50 -j ACCEPT # ipsec
+   $ipt -A FWDINTERNET -p 51 -j ACCEPT # AH authentication headers
+  done
+ fi
+
+ for ipt in $IPTABLES $IP6TABLES; do
+  $ipt -A FROMINTERNET -j DROP
+ done
+
+# Special case: Knoppix-Terminalserver
+ [ "$TERMINALSERVER" = "on" ] && LASTTARGET="RETURN" || LASTTARGET="REJECT"
+
+ if [ "$CURRENTMODE" = "easy" -o -z "$REMOTE_PORTS_ALLOWED" ]; then
+  for ipt in $IPTABLES $IP6TABLES; do
+   $ipt -A TOINTERNET -j ACCEPT
+   $ipt -A FWDINTERNET -j ACCEPT
+  done
+ else
+  for port in $REMOTE_PORTS_ALLOWED; do
+   if [ "$port" = "icmp" ]; then
+    $IPTABLES -A TOINTERNET -p icmp -j ACCEPT
+    $IP6TABLES -A TOINTERNET -p icmpv6 -j ACCEPT
+    $IPTABLES -A FWDINTERNET -p icmp -j ACCEPT
+    $IP6TABLES -A FWDINTERNET -p icmpv6 -j ACCEPT
+   else
+    for ipt in $IPTABLES $IP6TABLES; do
+     for prot in tcp udp; do
+      $ipt -A TOINTERNET -p $prot --dport $port -j ACCEPT
+      $ipt -A FWDINTERNET -p $prot --dport $port -j ACCEPT
+     done
+    done
+   fi
+  done
+  for ipt in $IPTABLES $IP6TABLES; do
+   $ipt -A TOINTERNET -j REJECT
+   $ipt -A FWDINTERNET -j $LASTTARGET
+  done
+ fi
+
+ runmasquerade
+ runlog
+ runsquid
+
+ if [ "$CURRENTMODE" = "expert" ]; then
+  [ -e /etc/sysconfig/firewall.iptables ] && . /etc/sysconfig/firewall.iptables
+ fi
+
+ echo "$$" > /var/run/firewall.pid
+ ACTIVE=yes
+
+ runterminalserver
+
+}
+
+fw_restart(){
+fw_reset; fw_start
+}
+
+# writeconfig variable_name variable_content
+# Replaces old variables
+writeconfig(){
+rm -f "$TMP"
+grep -v "^$1=" /etc/sysconfig/firewall >"$TMP" 2>/dev/null
+echo "$1='$2'" >>"$TMP"
+cat "$TMP" >/etc/sysconfig/firewall
+rm -f "$TMP"
+}
+
+mode() {
+    rm -f "$TMP"
+    $DIALOG --item-help --backtitle "$BACKTITLE" --title "$MODE_SELECTION" --menu "" 10 55 4 "Easy" "" "$HELP_EASY" "Medium" "" "$HELP_MEDIUM" "Expert" "" "$HELP_EXPERT" 2>"$TMP"
+	[ "$?" != "0" ] && return 1
+	read MODE_SELECTION <"$TMP"; rm -f "$TMP";
+    case "$MODE_SELECTION" in
+        Easy*) CURRENTMODE="easy";;
+        Medium*) CURRENTMODE="medium";;
+        Expert*) CURRENTMODE="expert";;
+        *) return 4;;
+    esac
+
+    writeconfig CURRENTMODE "$CURRENTMODE"
+    fw_restart
+}
+
+external_dev(){
+    rm -f "$TMP"
+    $DIALOG --help-button --help-label "$EXTENDED" --separate-output --backtitle "$BACKTITLE" --title "$EXTERNAL_DEVICE_SELECTION" --checklist "" 12 75 6 "eth0" "${NETWORK_CARD} 0" "${ETH0_EXT}" "eth1" "${NETWORK_CARD} 1" "${ETH1_EXT}" "eth+" "${ALL_NETWORK_CARDS}" "${ETHP_EXT}" "ppp0" "${PPP_DEVICE} 0" "${PPP0_EXT}" "ppp1" "${PPP_DEVICE} 1" "${PPP1_EXT}" "ppp+" "${ALL_PPP_DEVICES}" "${PPPP_EXT}" "ippp0" "${IPPP_DEVICE} 0" "${IPPP0_EXT}" "ippp1" "${IPPP_DEVICE} 1" "${IPPP1_EXT}" "ippp+" "${ALL_IPPP_DEVICES}" "${IPPPP_EXT}" 2>"$TMP"
+	case "$?" in
+	 0) true;;
+	 2) rm -f "$TMP"; $DIALOG --backtitle "$BACKTITLE" --title "$OWN_EXT_DEV" --inputbox "$OWN_DESC" 8 75 "$EXTDEVS" 2>"$TMP"; [ "$?" != "0" ] && return 2 ;;
+	 *) return 1;;
+	esac
+    EXTDEVS=""
+    line=""
+    for i in $(cat "$TMP"); do line="$line $(echo $i)"; done 
+    rm -f "$TMP"
+    EXTDEVS="$line"
+    writeconfig EXTDEVS "$EXTDEVS"
+
+    ETH0_EXT="off"
+    ETH1_EXT="off"
+    ETHP_EXT="off"
+    PPP0_EXT="off"
+    PPP1_EXT="off"
+    PPPP_EXT="off"
+    IPPP0_EXT="off"
+    IPPP1_EXT="off"
+    IPPPP_EXT="off"
+
+    case "$EXTDEVS" in *eth0*) ETH0_EXT="on";; esac
+    case "$EXTDEVS" in *eth1*) ETH1_EXT="on";; esac
+    case "$EXTDEVS" in *eth+*) ETHP_EXT="on";; esac
+    case "$EXTDEVS" in *ppp0*) PPP0_EXT="on";; esac
+    case "$EXTDEVS" in *ppp1*) PPP1_EXT="on";; esac
+    case "$EXTDEVS" in *ppp+*) PPPP_EXT="on";; esac
+    case "$EXTDEVS" in *ippp0*) IPPP0_EXT="on";; esac
+    case "$EXTDEVS" in *ippp1*) IPPP1_EXT="on";; esac
+    case "$EXTDEVS" in *ippp+*) IPPPP_EXT="on";; esac
+
+    fw_restart
+}
+
+knoppix_ts() {
+  rm -f "$TMP"
+  $DIALOG --backtitle "$BACKTITLE" --title "$TERMINALSERVER_SETTING" --menu "$TERMINALSERVER_HELP" 13 75 4 "${TERMINALSERVER_ON}" "" "${TERMINALSERVER_OFF}" "" "${TERMINALSERVER_SETUP}" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";
+  case "$SELECTION" in
+    $TERMINALSERVER_ON*) TERMINALSERVER="on";;
+    $TERMINALSERVER_OFF*) TERMINALSERVER="off";;
+    $TERMINALSERVER_SETUP*) kanotix-terminalserver config && TERMINALSERVER="on";;
+    *) return 3;;
+  esac
+
+  writeconfig TERMINALSERVER "$TERMINALSERVER"
+  fw_restart
+}
+
+active() {
+  rm -f "$TMP"
+  $DIALOG --backtitle "$BACKTITLE" --title "$ACTIVATE" --menu "" 9 55 3 "${ACTIVE_ON}" "" "${ACTIVE_OFF}" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";
+  case "$SELECTION" in
+    $ACTIVE_ON*)  fw_reset; ACTIVE=yes; fw_start;;
+    $ACTIVE_OFF*) ACTIVE=no; fw_reset;;
+    *) return 3;;
+  esac
+  writeconfig ACTIVE "$ACTIVE"
+}
+
+ipsec() {
+  rm -f "$TMP"
+  $DIALOG --backtitle "$BACKTITLE" --title "$IPSEC_SETTING" --menu "" 13 75 9 "${IPSEC_ON}" "" "${IPSEC_OFF}" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read PROXY_SELECTION <"$TMP"; rm -f "$TMP";
+  case "$PROXY_SELECTION" in
+    $IPSEC_ON*) IPSEC="on";;
+    $IPSEC_OFF*) IPSEC="off";;
+    *) return 3;;
+  esac
+  writeconfig IPSEC "$IPSEC"
+}
+
+incoming_ports() {
+    $DIALOG --separate-output --help-button --help-label "$EXTENDED" --backtitle "$BACKTITLE" --title "$INCOMING_PORTS_SELECTION" --checklist "" 12 75 6 "domain" "${DNS_PORT}" "${DNS_INT}" "icmp" "${ICMP_PORT}" "${ICMP_INT}" "www" "${HTTP_PORT}" "${HTTP_INT}" "https" "${HTTPS_PORT}" "${HTTPS_INT}" "ssh" "${SSH_PORT}" "${SSH_INT}" "ftp" "${FTP_PORT}" "${FTP_INT}" "telnet" "${TELNET_PORT}" "${TELNET_INT}" "smtp" "${SMTP_PORT}" "${SMTP_INT}" "time" "${TIME_PORT}" "${TIME_INT}" "whois" "${WHOIS_PORT}" "${WHOIS_INT}" "pop3" "${POP3_PORT}" "${POP3_INT}" "pop3s" "${POP3S_PORT}" "${POP3S_INT}" "imap" "${IMAP_PORT}" "${IMAP_INT}" "imaps" "${IMAPS_PORT}" "${IMAPS_INT}" 2>"$TMP"
+   	case "$?" in
+	 0) true;;
+	 2) rm -f "$TMP"; $DIALOG --backtitle "$BACKTITLE" --title "$INCOMING_PORTS_SELECTION" --inputbox "$OWN_DESC" 9 75 "$PORTS_ALLOWED" 2>"$TMP"; [ "$?" != "0" ] && return 2 ;;
+	 *) return 1;;
+	esac
+ 
+    PORTS_ALLOWED=""
+    line=""
+    for i in $(cat "$TMP"); do line="$line $(echo $i)"; done 
+    rm -f "$TMP"
+    PORTS_ALLOWED="$line"
+
+	writeconfig PORTS_ALLOWED "$PORTS_ALLOWED"
+
+    ICMP_INT="off"
+    HTTP_INT="off"
+    HTTPS_INT="off"
+    SSH_INT="off"
+    FTP_INT="off"
+    TELNET_INT="off"
+    SMTP_INT="off"
+    TIME_INT="off"
+    DNS_INT="off"
+    WHOIS_INT="off"
+    POP3_INT="off"
+    POP3S_INT="off"
+    IMAP_INT="off"
+    IMAPS_INT="off"
+    
+    case "$PORTS_ALLOWED" in *icmp*) ICMP_INT="on";; esac
+    case "$PORTS_ALLOWED" in *www*) HTTP_INT="on";; esac
+    case "$PORTS_ALLOWED" in *https*) HTTPS_INT="on";; esac
+    case "$PORTS_ALLOWED" in *ssh*) SSH_INT="on";; esac
+    case "$PORTS_ALLOWED" in *ftp*) FTP_INT="on";; esac
+    case "$PORTS_ALLOWED" in *telnet*) TELNET_INT="on";; esac
+    case "$PORTS_ALLOWED" in *smtp*) SMTP_INT="on";; esac
+    case "$PORTS_ALLOWED" in *time*) TIME_INT="on";; esac
+    case "$PORTS_ALLOWED" in *dns*) DNS_INT="on";; esac
+    case "$PORTS_ALLOWED" in *whois*) WHOIS_INT="on";; esac
+    case "$PORTS_ALLOWED" in *pop3\ *) POP3_INT="on";; esac
+    case "$PORTS_ALLOWED" in *pop3s*) POP3S_INT="on";; esac
+    case "$PORTS_ALLOWED" in *imap\ *) IMAP_INT="on";; esac
+    case "$PORTS_ALLOWED" in *imaps*) IMAPS_INT="on";; esac
+   
+}
+
+outgoing_ports() {
+    rm -f "$TMP"
+    $DIALOG --separate-output --help-button --help-label "$EXTENDED" --backtitle "$BACKTITLE" --title "$OUTGOING_PORTS_SELECTION" --checklist "$OUTGOING_PORTS_HELP" 14 75 6 "domain" "${DNS_PORT} (!)" "${DNS_EXT}" "icmp" "${ICMP_PORT}" "${ICMP_EXT}" "www" "${HTTP_PORT}" "${HTTP_EXT}" "https" "${HTTPS_PORT}" "${HTTPS_EXT}" "ssh" "${SSH_PORT}" "${SSH_EXT}" "ftp" "${FTP_PORT}" "${FTP_EXT}" "telnet" "${TELNET_PORT}" "${TELNET_EXT}" "smtp" "${SMTP_PORT}" "${SMTP_EXT}" "time" "${TIME_PORT}" "${TIME_EXT}" "whois" "${WHOIS_PORT}" "${WHOIS_EXT}" "pop3" "${POP3_PORT}" "${POP3_EXT}" "pop3s" "${POP3S_PORT}" "${POP3S_EXT}" "imap" "${IMAP_PORT}" "${IMAP_EXT}" "imaps" "${IMAPS_PORT}" "${IMAPS_EXT}" 2>"$TMP"
+    case "$?" in
+	 0) true;;
+	 2) rm -f "$TMP"; $DIALOG --backtitle "$BACKTITLE" --title "$OUTGOING_PORTS_SELECTION" --inputbox "$OWN_DESC" 9 75 "$REMOTE_PORTS_ALLOWED" 2>"$TMP"; [ "$?" != "0" ] && return 2 ;;
+	 *) return 1;;
+	esac
+ 
+    REMOTE_PORTS_ALLOWED=""
+    line=""
+    for i in $(cat "$TMP"); do line="$line $(echo $i)"; done 
+    rm -f "$TMP"
+    REMOTE_PORTS_ALLOWED="$line"
+
+	writeconfig REMOTE_PORTS_ALLOWED "$REMOTE_PORTS_ALLOWED"
+
+    ICMP_EXT="off"
+    HTTP_EXT="off"
+    HTTPS_EXT="off"
+    SSH_EXT="off"
+    FTP_EXT="off"
+    TELNET_EXT="off"
+    SMTP_EXT="off"
+    TIME_EXT="off"
+    DNS_EXT="off"
+    WHOIS_EXT="off"
+    POP3_EXT="off"
+    POP3S_EXT="off"
+    IMAP_EXT="off"
+    IMAPS_EXT="off"
+    
+    case "$REMOTE_PORTS_ALLOWED" in *icmp*) ICMP_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *www*) HTTP_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *https*) HTTPS_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *ssh*) SSH_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *ftp*) FTP_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *telnet*) TELNET_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *smtp*) SMTP_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *time*) TIME_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *dns*) DNS_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *whois*) WHOIS_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *pop3\ *) POP3_EXT="on";; esac
+    case "$REMOTE_PORTS_ALLOWED" in *pop3s*) POP3S_EXT="on";; esac
+}
+
+start_editor() {
+  if [ ! -e /etc/sysconfig/firewall.iptables ]; then
+   rm -f /etc/sysconfig/firewall.iptables
+   echo "# /etc/sysconfig/iptables
+# Knoppix Firewall IPTABLES extra script for \"expert\" mode only
+# Please enter your iptables filter rules here." > /etc/sysconfig/firewall.iptables
+  fi
+
+  if [ -n "$DISPLAY" ]; then
+    xedit /etc/sysconfig/firewall.iptables
+  else
+    vi /etc/sysconfig/firewall.iptables
+  fi
+  fw_restart
+}
+
+proxy(){
+  rm -f "$TMP"
+  $DIALOG --backtitle "$BACKTITLE" --title "$PROXY_SETTING" --menu "$PROXY_HELP" 12 75 3 "${PROXY_ON}" "" "${PROXY_OFF}" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";
+  case "$SELECTION" in
+    $PROXY_ON*) PROXY="on";;
+    $PROXY_OFF*) PROXY="off";;
+    *) return 3;;
+  esac
+  writeconfig PROXY "$PROXY"
+  fw_restart
+}
+
+masquerade(){
+  rm -f "$TMP"
+  $DIALOG --backtitle "$BACKTITLE" --title "$MASQUERADE_SETTING" --menu "$MASQUERADE_HELP" 12 75 3 "${MASQUERADE_ON}" "" "${MASQUERADE_OFF}" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";
+  case "$SELECTION" in
+    $MASQUERADE_ON*) MASQUERADE="on";;
+    $MASQUERADE_OFF*) MASQUERADE="off";;
+    *) return 3;;
+  esac
+  writeconfig MASQUERADE "$MASQUERADE"
+  fw_restart
+}
+
+fw_configure(){
+[ -f /etc/sysconfig/firewall ] && . /etc/sysconfig/firewall
+rm -f "$TMP"
+
+# eating leading whitespaces
+EXTDEVS="${EXTDEVS# }"
+PORTS_ALLOWED="${PORTS_ALLOWED# }"
+REMOTE_PORTS_ALLOWED="${REMOTE_PORTS_ALLOWED# }"
+
+case "$CURRENTMODE" in
+    *easy*) $DIALOG --backtitle "$BACKTITLE" --title "$MAIN" --menu "" 12 55 6 "${MODE}:" "${CURRENTMODE}" "${EXT_DEV}:" "${EXTDEVS}" "${ACTIVATE}" "${ACTIVE}" "${SAVECONFIG}" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";;
+    *medium*) $DIALOG --backtitle "$BACKTITLE" --title "$MAIN" --menu "" 18 75 12 "${MODE}:" "${CURRENTMODE}" "${EXT_DEV}:" "${EXTDEVS}" "${INCOMING_PORTS}:" "${PORTS_ALLOWED}" "${OUTGOING_PORTS}:" "${REMOTE_PORTS_ALLOWED}" "$MASQUERADE_SETTING" "$MASQUERADE" "$PROXY_SETTING" "$PROXY" "${IPSEC_T}" "${IPSEC}" "${KNOPPIX_TS}" "${TERMINALSERVER}" "$LOGPART_SETTING" "$LOGPART" "$ACTIVATE" "$ACTIVE" "$SAVECONFIG" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";;
+    *expert*) $DIALOG --backtitle "$BACKTITLE" --title "$MAIN" --menu "" 19 75 13 "${MODE}:" "${CURRENTMODE}" "${EXT_DEV}:" "${EXTDEVS}" "${INCOMING_PORTS}:" "${PORTS_ALLOWED}" "${OUTGOING_PORTS}:" "${REMOTE_PORTS_ALLOWED}"  "${IPSEC_T}" "${IPSEC}" "$MASQUERADE_SETTING" "$MASQUERADE" "$PROXY_SETTING" "$PROXY" "${KNOPPIX_TS}" "${TERMINALSERVER}" "${START_EDITOR}" " " "$LOGPART_SETTING" "$LOGPART" "$ACTIVATE" "$ACTIVE" "$SAVECONFIG" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";;
+esac
+case "$SELECTION" in
+    $MODE*) mode;;
+    $EXT_DEV*) external_dev;;
+    $INCOMING_PORTS*) incoming_ports;;
+    $OUTGOING_PORTS*) outgoing_ports;;
+    $IPSEC_T*) ipsec;;
+    $MASQUERADE_SETTING*) masquerade;;
+    $PROXY_SETTING*) proxy;;
+    $KNOPPIX_TS*) knoppix_ts;;
+    $START_EDITOR*) start_editor;;
+    $LOGPART_SETTING*) logpart;;
+    $ACTIVATE*) active;;
+    $SAVECONFIG*) saveconfig;;
+ *)          return 9;;
+esac
+return 0
+}
+
+# MAIN
+
+case "$1" in
+start)
+  fw_reset
+  fw_start
+  [ "$NOX" = "yes" ] && { iptraf -i all; exec $0 configure; }
+;;
+stop)
+ fw_reset
+;;
+*) # Configure
+ while true; do fw_configure || break; done
+;;
+esac
+
+bailout 0
+

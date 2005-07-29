@@ -1,0 +1,15 @@
+firewall-kanotix (0.1.2) unstable; urgency=low
+
+  * optimize packaging.
+  * bump standards version
+  * fix lintian errors.
+
+ -- Stefan Lippers-Hollmann <s.l-h@gmx.de>  Fri, 29 Jul 2005 21:26:22 +0200
+
+firewall-kanotix (0.1-1) unstable; urgency=low
+
+  * Initial Release.
+  * forked from Knoppix to suit XDG menu structure.
+
+ -- Stefan Lippers-Hollmann <s.l-h@gmx.de>  Sat, 13 Nov 2004 01:35:54 +0100
+
