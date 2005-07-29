@@ -2,7 +2,7 @@ Source: firewall-kanotix
 Section: x11
 Priority: optional
 Maintainer: Stefan Lippers-Hollmann <s.l-h@gmx.de>
-Build-Depends: @cdbs@
+Build-Depends-Indep: @cdbs@
 Standards-Version: 3.6.2
 
 Package: firewall-kanotix
@@ -11,6 +11,5 @@ Depends: sudo, dialog, bzip2, iptraf, iptables, kanotix-terminalserver, kanotix-
 Suggests: squid, xbase-clients, xdialog
 Provides: firewall-knoppix
 Replaces: firewall-knoppix
-Description: Easy dialog-based firewall configuration GUI.
- .
+Description: Easy dialog-based firewall configuration GUI
  Ported firewall-knoppix to suit Kanotix' packaging needs.

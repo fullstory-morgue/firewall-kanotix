@@ -3,8 +3,9 @@ firewall-kanotix (0.1.2) unstable; urgency=low
   * optimize packaging.
   * bump standards version
   * fix lintian errors.
+  * fix earlier upload.
 
- -- Stefan Lippers-Hollmann <s.l-h@gmx.de>  Fri, 29 Jul 2005 21:26:22 +0200
+ -- Stefan Lippers-Hollmann <s.l-h@gmx.de>  Fri, 29 Jul 2005 22:27:05 +0200
 
 firewall-kanotix (0.1-1) unstable; urgency=low
 
