@@ -288,7 +288,7 @@ saveconfig(){
  $DIALOG --backtitle "$BACKTITLE" --title "$SAVECONFIG" --defaultno --yesno "$NOX_SETTING" 8 65 && writeconfig NOX "yes" || writeconfig NOX "no"
  # Directory selector
  PARTITIONS=""
- for i in `awk '/^\/dev\/[hs]d[a-z].*\/mnt\/[hs]d[a-z]/{if(!/ntfs/){print $2}}' /etc/fstab`; do
+ for i in `awk '/^\/dev\/[hs]d[a-z].*\/media\/[hs]d[a-z]/{if(!/ntfs/){print $2}}' /etc/fstab`; do
  PARTITIONS="$PARTITIONS ${i} [Disk/Partition] off"
  done
  rm -f "$TMP"
@@ -313,7 +313,7 @@ logpart(){
  # Save logfiles to harddisk or usb memorystick
  # Directory selector
  PARTITIONS=""
- for i in `awk '/^\/dev\/[hs]d[a-z].*\/mnt\/[hs]d[a-z]/{if(!/ntfs/){print $2}}' /etc/fstab`; do
+ for i in `awk '/^\/dev\/[hs]d[a-z].*\/media\/[hs]d[a-z]/{if(!/ntfs/){print $2}}' /etc/fstab`; do
  PARTITIONS="$PARTITIONS ${i} [Disk/Partition]"
  case "$LOGPART" in *$i*) PARTITIONS="$PARTITIONS on";; *) PARTITIONS="$PARTITIONS off";; esac
  done
