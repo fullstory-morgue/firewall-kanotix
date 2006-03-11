@@ -2,6 +2,10 @@
 # KNOPPIX firewall configuration script
 # (C) Klaus Knopper 2004 - GPL
 
+# override tool behaviour through distro-defaults
+FLL_LIVE_USER="knoppix"
+[ -r /etc/default/distro ] && source /etc/default/distro 
+
 PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/X11R6/bin:/usr/local/bin"
 export PATH
 
@@ -18,7 +22,7 @@ XDIALOG_FORCE_AUTOSIZE=1
 export XDIALOG_FORCE_AUTOSIZE
 
 TMP="/tmp/firewall.$$"
-TMPSUFFIX="knoppix-firewall.save"
+TMPSUFFIX="${FLL_LIVE_USER}-firewall.save"
 
 DIALOG="dialog"
 [ -n "$DISPLAY" ] && [ -x /usr/bin/Xdialog ] && DIALOG="Xdialog"
@@ -31,7 +35,7 @@ exit $1
 }
 
 # LANGUAGE etc.
-[ -f /etc/sysconfig/knoppix ] && . /etc/sysconfig/knoppix
+[ -f /etc/sysconfig/${FLL_LIVE_USER} ] && . /etc/sysconfig/${FLL_LIVE_USER}
 [ -f /etc/sysconfig/firewall ] && . /etc/sysconfig/firewall
 [ -z "$LANG" ] && export LANG
 [ -z "$LANGUAGE" ] && export LANGUAGE
@@ -55,7 +59,7 @@ return 0
 }
 
 
-BACKTITLE="KNOPPIX FIREWALL TOOL"
+BACKTITLE="${FLL_DISTRO_NAME} FIREWALL TOOL"
 
 # Language-dependent Messages
 case "$LANGUAGE" in
@@ -69,12 +73,12 @@ ACTIVATE="Firewall Aktiv?"
 ACTIVE_ON="Firewall jetzt starten"
 ACTIVE_OFF="Firewall deaktivieren"
 EXT_DEV="Externe Netzwerkdevices"
-KNOPPIX_TS="Knoppix Terminal Server"
-TERMINALSERVER_HELP="Der Knoppix Terminalserver erlaubt es, diesen Rechner als Internet-Gateway, DHCP- und Bootserver für ein internes Netzwerk (LAN) zu konfigurieren."
-TERMINALSERVER_SETTING="Knoppix Terminal Server Einstellung"
-TERMINALSERVER_ON="Knoppix TS einschalten"
-TERMINALSERVER_OFF="Knoppix TS ausschalten"
-TERMINALSERVER_SETUP="Knoppix TS Setup"
+DISTRO_TS="Knoppix Terminal Server"
+TERMINALSERVER_HELP="Der ${FLL_DISTRO_NAME} Terminalserver erlaubt es, diesen Rechner als Internet-Gateway, DHCP- und Bootserver für ein internes Netzwerk (LAN) zu konfigurieren."
+TERMINALSERVER_SETTING="${FLL_DISTRO_NAME} Terminal Server Einstellung"
+TERMINALSERVER_ON="${FLL_DISTRO_NAME} TS einschalten"
+TERMINALSERVER_OFF="${FLL_DISTRO_NAME} TS ausschalten"
+TERMINALSERVER_SETUP="${FLL_DISTRO_NAME} TS Setup"
 IPSEC_T="IPSEC Transparenz"
 IPSEC_SETTING="IPSEC Einstellung"
 IPSEC_ON="IPSEC Transparenz ein"
@@ -126,7 +130,7 @@ SAVECONFIG_SUCCESS="Die Firewall-Konfiguration wurde erfolgreich gespeichert."
 NOX_SETTING="Möchten Sie beim Booten mit einem dedizierten Firewall-Setup starten (d.h. keine graphische Oberfläche)?"
 LOGPART_SETTING="Persistente Logdateien"
 LOGPART_HELP="Logdateien auf einer schreibbaren (Linux oder FAT32) Partition anlegen."
-LOGPART_ERROR="Fehler: Das Verzeichnis \"knoppix.log\" konnte nicht zum Schreiben angelegt werden."
+LOGPART_ERROR="Fehler: Das Verzeichnis \"${FLL_LIVE_USER}.log\" konnte nicht zum Schreiben angelegt werden."
 LOGPART_NONE="Kein permanentes Log einrichten."
 ;;
 *)
@@ -139,12 +143,12 @@ ACTIVATE="Firewall Active?"
 ACTIVE_ON="Start Firewall now"
 ACTIVE_OFF="Deactivate Firewall"
 EXT_DEV="External Devices"
-KNOPPIX_TS="Knoppix Terminal Server"
-TERMINALSERVER_SETTING="Knoppix Terminal Server Setting"
-TERMINALSERVER_HELP="The Knoppix Terminalserver can setup this computer as an internet gateway, DHCP- and Bootserver for a local network (LAN)."
-TERMINALSERVER_ON="Enable Knoppix TS"
-TERMINALSERVER_OFF="Disable Knoppix TS"
-TERMINALSERVER_SETUP="Setup Knoppix TS"
+DISTRO_TS="${FLL_DISTRO_NAME} Terminal Server"
+TERMINALSERVER_SETTING="${FLL_DISTRO_NAME} Terminal Server Setting"
+TERMINALSERVER_HELP="The ${FLL_DISTRO_NAME} Terminalserver can setup this computer as an internet gateway, DHCP- and Bootserver for a local network (LAN)."
+TERMINALSERVER_ON="Enable ${FLL_DISTRO_NAME} TS"
+TERMINALSERVER_OFF="Disable ${FLL_DISTRO_NAME} TS"
+TERMINALSERVER_SETUP="Setup ${FLL_DISTRO_NAME} TS"
 IPSEC_T="IPSEC transparency"
 IPSEC_SETTING="IPSEC transparency"
 IPSEC_ON="Turn on IPSEC transparency"
@@ -194,7 +198,7 @@ SAVECONFIG_SUCCESS="The firewall configuration was saved successfully."
 NOX_SETTING="Do you want to start with a dedicated firewall setup on reboot (i.e. no graphical environment running)?"
 LOGPART_SETTING="Persistent Logfiles"
 LOGPART_HELP="Write system logfiles to a (Linux or FAT32) harddisk partition."
-LOGPART_ERROR="Error: The \"knoppix.log\" directory could not be created in read/write mode."
+LOGPART_ERROR="Error: The \"${FLL_LIVE_USER}.log\" directory could not be created in read/write mode."
 LOGPART_NONE="Don't use a persistent log directory."
 ;;
 esac
@@ -396,10 +400,10 @@ if [ -z "$(grep "$LOGPART " /proc/mounts)" ] || grep -q "$LOGPART .*ntfs" /proc/
  $DIALOG --backtitle "$BACKTITLE" --title "$LOGPART_SETTING" --msgbox "$LOGPART_ERROR" 10 75
  return 1
 fi
-mkdir -p "$LOGPART/knoppix.log"
+mkdir -p "$LOGPART/${FLL_LIVE_USER}.log"
 /etc/init.d/sysklogd stop
 [ -L /var/log ] && rm -f /var/log || \mv -f /var/log /var/log.old
-ln -sf "$LOGPART/knoppix.log" /var/log
+ln -sf "$LOGPART/${FLL_LIVE_USER}.log" /var/log
 ( cp -au /var/log.old/* /var/log/ 2>/dev/null)
 /etc/init.d/sysklogd start
 }
@@ -639,7 +643,7 @@ external_dev(){
     fw_restart
 }
 
-knoppix_ts() {
+call_ts() {
   rm -f "$TMP"
   $DIALOG --backtitle "$BACKTITLE" --title "$TERMINALSERVER_SETTING" --menu "$TERMINALSERVER_HELP" 13 75 4 "${TERMINALSERVER_ON}" "" "${TERMINALSERVER_OFF}" "" "${TERMINALSERVER_SETUP}" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";
   case "$SELECTION" in
@@ -820,8 +824,8 @@ REMOTE_PORTS_ALLOWED="${REMOTE_PORTS_ALLOWED# }"
 
 case "$CURRENTMODE" in
     *easy*) $DIALOG --backtitle "$BACKTITLE" --title "$MAIN" --menu "" 12 55 6 "${MODE}:" "${CURRENTMODE}" "${EXT_DEV}:" "${EXTDEVS}" "${ACTIVATE}" "${ACTIVE}" "${SAVECONFIG}" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";;
-    *medium*) $DIALOG --backtitle "$BACKTITLE" --title "$MAIN" --menu "" 18 75 12 "${MODE}:" "${CURRENTMODE}" "${EXT_DEV}:" "${EXTDEVS}" "${INCOMING_PORTS}:" "${PORTS_ALLOWED}" "${OUTGOING_PORTS}:" "${REMOTE_PORTS_ALLOWED}" "$MASQUERADE_SETTING" "$MASQUERADE" "$PROXY_SETTING" "$PROXY" "${IPSEC_T}" "${IPSEC}" "${KNOPPIX_TS}" "${TERMINALSERVER}" "$LOGPART_SETTING" "$LOGPART" "$ACTIVATE" "$ACTIVE" "$SAVECONFIG" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";;
-    *expert*) $DIALOG --backtitle "$BACKTITLE" --title "$MAIN" --menu "" 19 75 13 "${MODE}:" "${CURRENTMODE}" "${EXT_DEV}:" "${EXTDEVS}" "${INCOMING_PORTS}:" "${PORTS_ALLOWED}" "${OUTGOING_PORTS}:" "${REMOTE_PORTS_ALLOWED}"  "${IPSEC_T}" "${IPSEC}" "$MASQUERADE_SETTING" "$MASQUERADE" "$PROXY_SETTING" "$PROXY" "${KNOPPIX_TS}" "${TERMINALSERVER}" "${START_EDITOR}" " " "$LOGPART_SETTING" "$LOGPART" "$ACTIVATE" "$ACTIVE" "$SAVECONFIG" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";;
+    *medium*) $DIALOG --backtitle "$BACKTITLE" --title "$MAIN" --menu "" 18 75 12 "${MODE}:" "${CURRENTMODE}" "${EXT_DEV}:" "${EXTDEVS}" "${INCOMING_PORTS}:" "${PORTS_ALLOWED}" "${OUTGOING_PORTS}:" "${REMOTE_PORTS_ALLOWED}" "$MASQUERADE_SETTING" "$MASQUERADE" "$PROXY_SETTING" "$PROXY" "${IPSEC_T}" "${IPSEC}" "${DISTRO_TS}" "${TERMINALSERVER}" "$LOGPART_SETTING" "$LOGPART" "$ACTIVATE" "$ACTIVE" "$SAVECONFIG" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";;
+    *expert*) $DIALOG --backtitle "$BACKTITLE" --title "$MAIN" --menu "" 19 75 13 "${MODE}:" "${CURRENTMODE}" "${EXT_DEV}:" "${EXTDEVS}" "${INCOMING_PORTS}:" "${PORTS_ALLOWED}" "${OUTGOING_PORTS}:" "${REMOTE_PORTS_ALLOWED}"  "${IPSEC_T}" "${IPSEC}" "$MASQUERADE_SETTING" "$MASQUERADE" "$PROXY_SETTING" "$PROXY" "${DISTRO_TS}" "${TERMINALSERVER}" "${START_EDITOR}" " " "$LOGPART_SETTING" "$LOGPART" "$ACTIVATE" "$ACTIVE" "$SAVECONFIG" "" 2>"$TMP"; [ "$?" != "0" ] && return 1; read SELECTION <"$TMP"; rm -f "$TMP";;
 esac
 case "$SELECTION" in
     $MODE*) mode;;
@@ -831,7 +835,7 @@ case "$SELECTION" in
     $IPSEC_T*) ipsec;;
     $MASQUERADE_SETTING*) masquerade;;
     $PROXY_SETTING*) proxy;;
-    $KNOPPIX_TS*) knoppix_ts;;
+    $DISTRO_TS*) call_ts;;
     $START_EDITOR*) start_editor;;
     $LOGPART_SETTING*) logpart;;
     $ACTIVATE*) active;;

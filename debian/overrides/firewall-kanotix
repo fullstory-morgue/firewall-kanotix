@@ -1,1 +1,0 @@
-firewall-kanotix: script-in-etc-init.d-not-registered-via-update-rc.d /etc/init.d/firewall

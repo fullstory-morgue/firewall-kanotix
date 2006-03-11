@@ -4,4 +4,3 @@ firewall usr/sbin/
 startiptraf usr/sbin/
 *.desktop usr/share/applnk/Kanotix/Services/
 icons/* usr/share/icons/
-debian/overrides/firewall-kanotix usr/share/lintian/overrides/
