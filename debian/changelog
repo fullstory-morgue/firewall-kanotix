@@ -1,8 +1,9 @@
-firewall-kanotix (0.1.6) UNRELEASED; urgency=low
+firewall-kanotix (0.1.6) unstable; urgency=low
 
-  * NOT RELEASED YET
+  * switch to utf-8.
+  * fix lintian errors.
 
- -- Stefan Lippers-Hollmann <s.l-h@gmx.de>  Sat, 11 Mar 2006 22:13:01 +0100
+ -- Stefan Lippers-Hollmann <s.l-h@gmx.de>  Tue, 31 Oct 2006 23:52:20 +0100
 
 firewall-kanotix (0.1.5) unstable; urgency=low
 
