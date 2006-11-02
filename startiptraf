@@ -2,13 +2,10 @@
 # startsyslog - Start syslogd and show logging messages
 # (C) Klaus Knopper Jun 2001
 
-PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/X11R6/bin"
+PATH="/bin:/sbin:/usr/bin:/usr/sbin"
 export PATH
 
 TITLE="IPTRAF"
-
-# LANG et al.
-[ -f /etc/sysconfig/i18n ] && . /etc/sysconfig/i18n
 
 RXVT=""
 [ -n "$DISPLAY" ] && RXVT="rxvt -T $TITLE -bg black -fg green -cr red -e"
@@ -17,3 +14,4 @@ RXVT=""
 iptraf
 
 exit 0
+
