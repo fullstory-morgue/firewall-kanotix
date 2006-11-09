@@ -64,7 +64,7 @@ getbootparam() {
 BACKTITLE="${FLL_DISTRO_NAME} FIREWALL TOOL"
 
 # Language-dependent Messages
-case "$LANGUAGE" in
+case "$LANG" in
 	de*|at*|ch*)
 		MAIN="Hauptmenü"
 		MODE="Modus"

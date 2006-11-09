@@ -1,8 +1,10 @@
 firewall-kanotix (0.1.8) UNRELEASED; urgency=low
 
   * NOT RELEASED YET
+  * fix i18n handling.
+  * use kanotix-su.
 
- -- Stefan Lippers-Hollmann <s.l-h@gmx.de>  Thu,  2 Nov 2006 23:26:52 +0100
+ -- Stefan Lippers-Hollmann <s.l-h@gmx.de>  Thu,  9 Nov 2006 19:45:20 +0100
 
 firewall-kanotix (0.1.7) unstable; urgency=low
 
