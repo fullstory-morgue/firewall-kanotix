@@ -1,6 +1,7 @@
-firewall-kanotix (0.1.8) UNRELEASED; urgency=low
+firewall-kanotix (0.1.8) ORPHANED; urgency=low
 
   * NOT RELEASED YET
+  * ORPHANED
   * fix i18n handling.
   * use kanotix-su.
 
